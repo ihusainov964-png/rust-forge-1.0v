@@ -201,28 +201,21 @@ pub fn get_windows_perf_info() -> Vec<(String, String)> {
 
     #[cfg(target_os = "windows")]
     {
-        // Check current power plan
-        if let Ok(output) = std::process::Command::new("powercfg")
-            .args(["-getactivescheme"])
-            .output()
-        {
-            let s = String::from_utf8_lossy(&output.stdout);
-            let plan = if s.contains("Ultimate") { "Ultimate Performance ✅" }
-                else if s.contains("High performance") || s.contains("High Performance") { "High Performance" }
-                else if s.contains("Balanced") { "Balanced ⚠️" }
-                else { "Unknown" };
-            info.push(("Power Plan".to_string(), plan.to_string()));
-        }
-
         // Check Game Mode registry
-        if let Ok(hkcu) = std::panic::catch_unwind(|| {
+        {
             use winreg::enums::HKEY_CURRENT_USER;
             use winreg::RegKey;
-            let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-            let key = hkcu.open_subkey(r"SOFTWARE\Microsoft\GameBar").ok()?;
-            let val: u32 = key.get_value("AutoGameModeEnabled").ok()?;
-            Some(val)
-        }) {
+            let status = (|| -> Option<&'static str> {
+                let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+                let key = hkcu.open_subkey(r"SOFTWARE\Microsoft\GameBar").ok()?;
+                let val: u32 = key.get_value("AutoGameModeEnabled").ok()?;
+                match val {
+                    1 => Some("Enabled ✅"),
+                    0 => Some("Disabled"),
+                    _ => Some("Unknown"),
+                }
+            })().unwrap_or("Unknown");
+            info.push(("Game Mode".to_string(), status.to_string()));
             let status = match hkcu.ok().flatten() {
                 Some(1) => "Enabled ✅",
                 Some(0) => "Disabled",

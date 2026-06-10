@@ -1,0 +1,37 @@
+[package]
+name = "rust-forge"
+version = "1.0.0"
+edition = "2021"
+authors = ["RustForge"]
+description = "RustForge — Ultimate Rust Game Optimizer & Launcher"
+license = "MIT"
+
+[[bin]]
+name = "rust-forge"
+path = "src/main.rs"
+
+[dependencies]
+eframe = { version = "=0.22.0", default-features = false, features = [
+    "default_fonts",
+    "glow",
+] }
+egui        = "=0.22.0"
+serde       = { version = "=1.0.193", features = ["derive"] }
+serde_json  = "=1.0.108"
+dirs        = "=4.0.0"
+log         = "=0.4.20"
+env_logger  = "=0.10.1"
+chrono      = { version = "=0.4.31", features = ["serde"] }
+anyhow      = "=1.0.75"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "=0.51.0"
+
+[patch.crates-io]
+egui-winit = { path = "vendor/egui-winit-patched" }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"

@@ -1,0 +1,100 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build release
+        env:
+          CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+        run: cargo build --release --target x86_64-pc-windows-msvc
+
+      - name: Rename artifact
+        run: |
+          copy target\x86_64-pc-windows-msvc\release\rust-forge.exe rust-forge.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-forge-windows
+          path: rust-forge.exe
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: rust-forge.exe
+          body: |
+            ## RustForge ${{ github.ref_name }}
+
+            ### Скачать
+            👉 **[rust-forge.exe](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/rust-forge.exe)**
+
+            ### Изменения
+            - Оптимизированные Launch Options для текущей версии Rust
+            - Улучшенные профили настроек графики
+            - Исправления и улучшения
+
+            ### Безопасность
+            ✅ Нет читов | ✅ Нет инъекций | ✅ Безопасно для EAC
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libxcb1-dev libx11-dev libxrandr-dev \
+            pkg-config libfontconfig1-dev \
+            libwayland-dev libxkbcommon-dev
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build release
+        env:
+          CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+        run: cargo build --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-forge-linux
+          path: target/release/rust-forge

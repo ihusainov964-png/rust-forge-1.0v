@@ -26,6 +26,14 @@ anyhow      = "=1.0.75"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "=0.51.0"
+winapi = { version = "=0.3.9", features = [
+    "winuser",
+    "windef",
+    "wingdi",
+    "libloaderapi",
+    "processthreadsapi",
+    "winerror",
+] }
 
 [patch.crates-io]
 egui-winit = { path = "vendor/egui-winit-patched" }

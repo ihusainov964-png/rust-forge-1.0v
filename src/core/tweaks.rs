@@ -201,6 +201,19 @@ pub fn get_windows_perf_info() -> Vec<(String, String)> {
 
     #[cfg(target_os = "windows")]
     {
+        // Check current power plan
+        if let Ok(output) = std::process::Command::new("powercfg")
+            .args(["-getactivescheme"])
+            .output()
+        {
+            let s = String::from_utf8_lossy(&output.stdout);
+            let plan = if s.contains("Ultimate") { "Ultimate Performance ✅" }
+                else if s.contains("High performance") || s.contains("High Performance") { "High Performance" }
+                else if s.contains("Balanced") { "Balanced ⚠️" }
+                else { "Unknown" };
+            info.push(("Power Plan".to_string(), plan.to_string()));
+        }
+
         // Check Game Mode registry
         {
             use winreg::enums::HKEY_CURRENT_USER;
@@ -215,12 +228,6 @@ pub fn get_windows_perf_info() -> Vec<(String, String)> {
                     _ => Some("Unknown"),
                 }
             })().unwrap_or("Unknown");
-            info.push(("Game Mode".to_string(), status.to_string()));
-            let status = match hkcu.ok().flatten() {
-                Some(1) => "Enabled ✅",
-                Some(0) => "Disabled",
-                _ => "Unknown",
-            };
             info.push(("Game Mode".to_string(), status.to_string()));
         }
     }

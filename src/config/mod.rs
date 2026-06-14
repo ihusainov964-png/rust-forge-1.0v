@@ -364,13 +364,29 @@ impl GraphicsConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SystemTweaks {
+    // Performance
+    pub ultimate_power_plan: bool,
     pub game_mode: bool,
     pub hardware_gpu_scheduling: bool,
-    pub high_process_priority: bool,
-    pub ultimate_power_plan: bool,
     pub disable_xbox_game_bar: bool,
     pub disable_fullscreen_optimizations: bool,
-    pub enable_mpo_disable: bool,  // Disable Multi-Plane Overlay (fixes stutters)
+    pub set_high_timer_res: bool,
+
+    // Parasite processes
+    pub kill_xbox_services: bool,
+    pub kill_superfetch: bool,
+    pub kill_windows_search: bool,
+    pub kill_print_spooler: bool,
+    pub kill_fax: bool,
+
+    // Network
+    pub optimize_network: bool,
+    pub disable_nagle: bool,
+
+    // Privacy / telemetry
+    pub disable_telemetry: bool,
+    pub disable_tips: bool,
+
     pub tweaks_applied: bool,
     pub tweaks_backup: Option<SystemTweaksBackup>,
 }

@@ -286,5 +286,3 @@ pub fn get_nvidia_tips() -> Vec<String> {
         "📌 Reflex Low Latency → On + Boost".to_string(),
     ]
 }
-EOF
-echo "tweaks.rs done"

@@ -1,4 +1,5 @@
 // app.rs — Main application state and eframe update loop (egui 0.22)
+// Performance: all heavy ops cached, no blocking calls in UI thread
 
 use crate::config::{AppConfig, Notification, NotificationKind};
 use crate::core::{
@@ -24,6 +25,7 @@ pub enum PendingAction {
     RevertTweaks,
     RestoreBackup,
     ClearCache,
+    RefreshSysInfo,
 }
 
 pub struct RustForgeApp {
@@ -34,13 +36,20 @@ pub struct RustForgeApp {
     pub show_results_modal: bool,
     pub new_profile_name: String,
     pub steam_found: bool,
-    pub first_frame: bool,
+
+    // Cached system info — refreshed only on demand, not every frame
+    pub cached_perf_info: Vec<(String, String)>,
+    pub perf_info_age: std::time::Instant,
+
+    // Save throttle
+    last_save: std::time::Instant,
 }
 
 impl RustForgeApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         apply_theme(&cc.egui_ctx);
 
+        // Heavy ops only once at startup
         let mut config = load_config();
         config.detected_hardware = detect_hardware();
         info!(
@@ -52,6 +61,9 @@ impl RustForgeApp {
 
         let steam_found = crate::core::steam::find_steam_path().is_some();
 
+        // Cache initial perf info
+        let cached_perf_info = crate::core::tweaks::get_windows_perf_info();
+
         Self {
             config,
             notifications: Vec::new(),
@@ -60,7 +72,9 @@ impl RustForgeApp {
             show_results_modal: false,
             new_profile_name: String::new(),
             steam_found,
-            first_frame: true,
+            cached_perf_info,
+            perf_info_age: std::time::Instant::now(),
+            last_save: std::time::Instant::now(),
         }
     }
 
@@ -71,6 +85,15 @@ impl RustForgeApp {
             timestamp: std::time::Instant::now(),
         });
         info!("[notif] {}", msg);
+    }
+
+    /// Get cached perf info — auto-refreshes every 10 seconds
+    pub fn get_perf_info(&mut self) -> &Vec<(String, String)> {
+        if self.perf_info_age.elapsed().as_secs() > 10 {
+            self.cached_perf_info = crate::core::tweaks::get_windows_perf_info();
+            self.perf_info_age = std::time::Instant::now();
+        }
+        &self.cached_perf_info
     }
 
     fn process_pending_action(&mut self) {
@@ -122,6 +145,9 @@ impl RustForgeApp {
                         self.action_results    = results;
                         self.show_results_modal = true;
                         self.push_notification("Твики применены!", NotificationKind::Success);
+                        // Refresh perf info after applying tweaks
+                        self.cached_perf_info = crate::core::tweaks::get_windows_perf_info();
+                        self.perf_info_age = std::time::Instant::now();
                     }
                     Err(e) => self.push_notification(&format!("Ошибка твиков: {}", e), NotificationKind::Error),
                 }
@@ -134,6 +160,8 @@ impl RustForgeApp {
                         self.action_results    = results;
                         self.show_results_modal = true;
                         self.push_notification("Настройки откачены!", NotificationKind::Info);
+                        self.cached_perf_info = crate::core::tweaks::get_windows_perf_info();
+                        self.perf_info_age = std::time::Instant::now();
                     }
                     Err(e) => self.push_notification(&format!("Ошибка отката: {}", e), NotificationKind::Error),
                 }
@@ -161,10 +189,20 @@ impl RustForgeApp {
                     Err(e) => self.push_notification(&format!("Ошибка очистки: {}", e), NotificationKind::Error),
                 }
             }
+
+            PendingAction::RefreshSysInfo => {
+                self.cached_perf_info = crate::core::tweaks::get_windows_perf_info();
+                self.perf_info_age = std::time::Instant::now();
+                self.push_notification("Статус системы обновлён", NotificationKind::Info);
+            }
         }
 
-        if let Err(e) = save_config(&self.config) {
-            error!("Failed to save config: {}", e);
+        // Throttled save — not more than once per 2 seconds
+        if self.last_save.elapsed().as_secs() >= 2 {
+            if let Err(e) = save_config(&self.config) {
+                error!("Failed to save config: {}", e);
+            }
+            self.last_save = std::time::Instant::now();
         }
     }
 }
@@ -173,11 +211,11 @@ impl eframe::App for RustForgeApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.process_pending_action();
 
-        // Auto-save every ~120 frames
-        if ctx.frame_nr() % 120 == 0 && !self.first_frame {
+        // Auto-save every 30 seconds (not every frame!)
+        if self.last_save.elapsed().as_secs() >= 30 {
             let _ = save_config(&self.config);
+            self.last_save = std::time::Instant::now();
         }
-        self.first_frame = false;
 
         // ── Top bar ──────────────────────────────────────────────────────────
         egui::TopBottomPanel::top("top_panel")
@@ -187,7 +225,6 @@ impl eframe::App for RustForgeApp {
                 .inner_margin(egui::style::Margin::symmetric(16.0, 10.0)))
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    // Logo
                     ui.label(RichText::new("⚙").size(26.0).color(C_RUST));
                     ui.add_space(4.0);
                     ui.vertical(|ui| {
@@ -196,7 +233,6 @@ impl eframe::App for RustForgeApp {
                     });
                     ui.add_space(20.0);
 
-                    // Steam status badge
                     if self.steam_found {
                         ui.label(RichText::new("🟢 Steam найден").size(11.0).color(C_SUCCESS));
                     } else {
@@ -204,12 +240,11 @@ impl eframe::App for RustForgeApp {
                     }
                     ui.add_space(12.0);
 
-                    // Quick hardware info
                     let hw = &self.config.detected_hardware;
                     if !hw.gpu_name.is_empty() && hw.gpu_name != "Unknown GPU" {
                         let short = hw.gpu_name
                             .replace("NVIDIA GeForce ", "")
-                            .replace("AMD Radeon ",     "");
+                            .replace("AMD Radeon ", "");
                         let short = if short.len() > 22 { &short[..22] } else { &short };
                         ui.label(RichText::new(format!("GPU: {}", short)).size(11.0).color(C_TEXT_DIM));
                     }
@@ -219,7 +254,6 @@ impl eframe::App for RustForgeApp {
                         ).size(11.0).color(C_TEXT_DIM));
                     }
 
-                    // ONE-CLICK BOOST (right-aligned)
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         let boost_btn = egui::Button::new(
                             RichText::new("⚡ ONE-CLICK BOOST").size(14.0).strong().color(Color32::WHITE),
@@ -229,9 +263,7 @@ impl eframe::App for RustForgeApp {
                         .min_size(egui::vec2(170.0, 34.0));
 
                         if ui.add(boost_btn)
-                            .on_hover_text(
-                                "Применяет профиль «Balanced PVP» + системные твики + запускает Rust.\nОдна кнопка для максимального результата!"
-                            )
+                            .on_hover_text("Применяет профиль «Balanced PVP» + запускает Rust")
                             .clicked()
                         {
                             if let Some(p) = self.config.profiles.get("Balanced PVP") {
@@ -246,7 +278,7 @@ impl eframe::App for RustForgeApp {
                 });
             });
 
-        // ── Bottom status bar ────────────────────────────────────────────────
+        // ── Bottom bar ───────────────────────────────────────────────────────
         egui::TopBottomPanel::bottom("bottom_panel")
             .frame(egui::Frame::none()
                 .fill(C_METAL_DARK)
@@ -257,7 +289,7 @@ impl eframe::App for RustForgeApp {
                     ui.label(RichText::new("RustForge v1.0.0").size(11.0).color(C_TEXT_DIM));
                     ui.separator();
                     ui.label(RichText::new(
-                        "Только легальные твики • Никаких читов • Безопасно для EAC"
+                        "Только легальные твики • Безопасно для EAC"
                     ).size(11.0).color(C_TEXT_DIM));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if secondary_button(ui, "🗑️ Очистить кэш").clicked() {
@@ -267,7 +299,7 @@ impl eframe::App for RustForgeApp {
                 });
             });
 
-        // ── Left sidebar tabs ────────────────────────────────────────────────
+        // ── Left sidebar ─────────────────────────────────────────────────────
         egui::SidePanel::left("tabs_panel")
             .resizable(false)
             .exact_width(155.0)
@@ -291,9 +323,7 @@ impl eframe::App for RustForgeApp {
                             .color(if is_active { C_RUST_BRIGHT } else { C_TEXT }),
                     )
                     .fill(if is_active { C_RUST_DARK } else { egui::Color32::TRANSPARENT })
-                    .stroke(egui::Stroke::new(
-                        if is_active { 1.5 } else { 0.0 }, C_RUST,
-                    ))
+                    .stroke(egui::Stroke::new(if is_active { 1.5 } else { 0.0 }, C_RUST))
                     .min_size(egui::vec2(136.0, 36.0));
 
                     if ui.add(btn).clicked() {
@@ -343,7 +373,9 @@ impl eframe::App for RustForgeApp {
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-                .frame(egui::Frame::window(&ctx.style()).fill(C_METAL).stroke(egui::Stroke::new(1.5, C_RUST)))
+                .frame(egui::Frame::window(&ctx.style())
+                    .fill(C_METAL)
+                    .stroke(egui::Stroke::new(1.5, C_RUST)))
                 .show(ctx, |ui| {
                     ui.add_space(4.0);
                     for r in &results {
@@ -357,10 +389,11 @@ impl eframe::App for RustForgeApp {
                 });
         }
 
-        // Animate notifications
+        // Repaint ONLY when notifications are active — otherwise egui is idle
         if !self.notifications.is_empty() {
-            ctx.request_repaint_after(std::time::Duration::from_millis(100));
+            ctx.request_repaint_after(std::time::Duration::from_millis(150));
         }
+        // No unconditional repaint = zero CPU when idle!
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {

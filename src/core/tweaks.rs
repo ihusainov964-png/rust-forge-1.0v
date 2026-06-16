@@ -41,6 +41,21 @@ pub fn apply_system_tweaks(tweaks: &SystemTweaks) -> Result<Vec<String>> {
         if tweaks.kill_windows_search   { kill_service("WSearch");       applied.push("✅ Windows Search остановлен".to_string()); }
         if tweaks.kill_print_spooler    { kill_service("Spooler");       applied.push("✅ Print Spooler остановлен".to_string()); }
         if tweaks.kill_fax             { kill_service("Fax");            applied.push("✅ Fax сервис остановлен".to_string()); }
+        if tweaks.kill_remote_registry  { kill_service("RemoteRegistry"); applied.push("✅ Remote Registry остановлен".to_string()); }
+        if tweaks.kill_tablet_input     { kill_service("TabletInputService"); kill_service("hidserv"); applied.push("✅ Tablet Input остановлен".to_string()); }
+        if tweaks.kill_secondary_logon  { kill_service("seclogon");       applied.push("✅ Secondary Logon остановлен".to_string()); }
+        if tweaks.kill_diagnostic_policy { kill_service("DPS"); kill_service("WdiServiceHost"); applied.push("✅ Diagnostic Policy остановлен".to_string()); }
+        if tweaks.kill_downloaded_maps  { kill_service("MapsBroker");     applied.push("✅ Maps Manager остановлен".to_string()); }
+        if tweaks.disable_qos           { disable_qos_reg();               applied.push("✅ QoS резервирование отключено (+20% канала)".to_string()); }
+        if tweaks.optimize_dns          { optimize_dns_reg();              applied.push("✅ DNS кэш оптимизирован".to_string()); }
+        if tweaks.disable_network_throttling { disable_net_throttle_reg(); applied.push("✅ Network Throttling отключён".to_string()); }
+        if tweaks.disable_activity_history { disable_activity_reg();      applied.push("✅ История активности отключена".to_string()); }
+        if tweaks.disable_location      { disable_location_reg();          applied.push("✅ Геолокация отключена".to_string()); }
+        if tweaks.disable_cortana       { disable_cortana_reg();           applied.push("✅ Cortana отключена".to_string()); }
+        if tweaks.disable_compat_telemetry { disable_compat_telemetry_reg(); applied.push("✅ CompatTelRunner отключён".to_string()); }
+        if tweaks.disable_animations    { disable_animations_reg();        applied.push("✅ Анимации Windows отключены".to_string()); }
+        if tweaks.disable_transparency  { disable_transparency_reg();      applied.push("✅ Прозрачность интерфейса отключена".to_string()); }
+        if tweaks.classic_menu          { enable_classic_menu_reg();       applied.push("✅ Классическое меню ПКМ включено".to_string()); }
         if tweaks.disable_telemetry    { disable_telemetry_reg();        applied.push("✅ Телеметрия Windows отключена".to_string()); }
         if tweaks.disable_tips         { disable_tips_reg();             applied.push("✅ Советы и уведомления Windows отключены".to_string()); }
         if tweaks.set_high_timer_res   { set_timer_resolution();        applied.push("✅ Таймер системы: высокое разрешение".to_string()); }
@@ -285,4 +300,145 @@ pub fn get_nvidia_tips() -> Vec<String> {
         "📌 Shader Cache → Unlimited".to_string(),
         "📌 Reflex Low Latency → On + Boost".to_string(),
     ]
+}
+
+// ── New registry functions ────────────────────────────────────────────────────
+
+#[cfg(target_os = "windows")]
+fn disable_qos_reg() {
+    use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_WRITE};
+    use winreg::RegKey;
+    if let Ok(hklm) = std::panic::catch_unwind(|| RegKey::predef(HKEY_LOCAL_MACHINE)) {
+        if let Ok((k, _)) = hklm.create_subkey_with_flags(
+            r"SOFTWARE\Policies\Microsoft\Windows\Psched", KEY_WRITE) {
+            let _ = k.set_value("NonBestEffortLimit", &0u32);
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn optimize_dns_reg() {
+    use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_WRITE};
+    use winreg::RegKey;
+    if let Ok(hklm) = std::panic::catch_unwind(|| RegKey::predef(HKEY_LOCAL_MACHINE)) {
+        if let Ok((k, _)) = hklm.create_subkey_with_flags(
+            r"SYSTEM\CurrentControlSet\Services\Dnscache\Parameters", KEY_WRITE) {
+            let _ = k.set_value("MaxCacheEntryTtlLimit",    &86400u32);
+            let _ = k.set_value("MaxSOACacheEntryTtlLimit", &300u32);
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn disable_net_throttle_reg() {
+    use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_WRITE};
+    use winreg::RegKey;
+    if let Ok(hklm) = std::panic::catch_unwind(|| RegKey::predef(HKEY_LOCAL_MACHINE)) {
+        if let Ok((k, _)) = hklm.create_subkey_with_flags(
+            r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile", KEY_WRITE) {
+            let _ = k.set_value("NetworkThrottlingIndex", &0xffffffffu32);
+            let _ = k.set_value("SystemResponsiveness",  &0u32);
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn disable_activity_reg() {
+    use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_WRITE};
+    use winreg::RegKey;
+    if let Ok(hklm) = std::panic::catch_unwind(|| RegKey::predef(HKEY_LOCAL_MACHINE)) {
+        if let Ok((k, _)) = hklm.create_subkey_with_flags(
+            r"SOFTWARE\Policies\Microsoft\Windows\System", KEY_WRITE) {
+            let _ = k.set_value("EnableActivityFeed",    &0u32);
+            let _ = k.set_value("PublishUserActivities", &0u32);
+            let _ = k.set_value("UploadUserActivities",  &0u32);
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn disable_location_reg() {
+    use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_WRITE};
+    use winreg::RegKey;
+    if let Ok(hklm) = std::panic::catch_unwind(|| RegKey::predef(HKEY_LOCAL_MACHINE)) {
+        if let Ok((k, _)) = hklm.create_subkey_with_flags(
+            r"SOFTWARE\Policies\Microsoft\Windows\LocationAndSensors", KEY_WRITE) {
+            let _ = k.set_value("DisableLocation", &1u32);
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn disable_cortana_reg() {
+    use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_WRITE};
+    use winreg::RegKey;
+    if let Ok(hklm) = std::panic::catch_unwind(|| RegKey::predef(HKEY_LOCAL_MACHINE)) {
+        if let Ok((k, _)) = hklm.create_subkey_with_flags(
+            r"SOFTWARE\Policies\Microsoft\Windows\Windows Search", KEY_WRITE) {
+            let _ = k.set_value("AllowCortana",           &0u32);
+            let _ = k.set_value("DisableWebSearch",       &1u32);
+            let _ = k.set_value("ConnectedSearchUseWeb",  &0u32);
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn disable_compat_telemetry_reg() {
+    use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_WRITE};
+    use winreg::RegKey;
+    if let Ok(hklm) = std::panic::catch_unwind(|| RegKey::predef(HKEY_LOCAL_MACHINE)) {
+        if let Ok((k, _)) = hklm.create_subkey_with_flags(
+            r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags", KEY_WRITE) {
+            let _ = k.set_value("UpgradeEligible", &0u32);
+        }
+        // Disable via task scheduler
+        let _ = std::process::Command::new("schtasks")
+            .args(["/change", "/TN", r"Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser", "/DISABLE"])
+            .output();
+        let _ = std::process::Command::new("schtasks")
+            .args(["/change", "/TN", r"Microsoft\Windows\Application Experience\ProgramDataUpdater", "/DISABLE"])
+            .output();
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn disable_animations_reg() {
+    use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
+    use winreg::RegKey;
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    if let Ok((k, _)) = hkcu.create_subkey_with_flags(
+        r"Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects", KEY_WRITE) {
+        let _ = k.set_value("VisualFXSetting", &2u32); // 2 = Best Performance
+    }
+    if let Ok((k, _)) = hkcu.create_subkey_with_flags(
+        r"Control Panel\Desktop\WindowMetrics", KEY_WRITE) {
+        let _ = k.set_value("MinAnimate", &"0".to_string());
+    }
+    if let Ok((k, _)) = hkcu.create_subkey_with_flags(
+        r"Control Panel\Desktop", KEY_WRITE) {
+        let _ = k.set_value("UserPreferencesMask", &[0x90u8, 0x12, 0x03, 0x80, 0x10, 0x00, 0x00, 0x00][..]);
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn disable_transparency_reg() {
+    use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
+    use winreg::RegKey;
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    if let Ok((k, _)) = hkcu.create_subkey_with_flags(
+        r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", KEY_WRITE) {
+        let _ = k.set_value("EnableTransparency", &0u32);
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn enable_classic_menu_reg() {
+    use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
+    use winreg::RegKey;
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    // Windows 11 classic context menu
+    if let Ok((k, _)) = hkcu.create_subkey_with_flags(
+        r"Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32", KEY_WRITE) {
+        let _ = k.set_value("", &"".to_string());
+    }
 }

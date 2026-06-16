@@ -378,14 +378,31 @@ pub struct SystemTweaks {
     pub kill_windows_search: bool,
     pub kill_print_spooler: bool,
     pub kill_fax: bool,
+    pub kill_remote_registry: bool,
+    pub kill_tablet_input: bool,
+    pub kill_secondary_logon: bool,
+    pub kill_diagnostic_policy: bool,
+    pub kill_downloaded_maps: bool,
 
     // Network
     pub optimize_network: bool,
     pub disable_nagle: bool,
+    pub disable_qos: bool,
+    pub optimize_dns: bool,
+    pub disable_network_throttling: bool,
 
     // Privacy / telemetry
     pub disable_telemetry: bool,
     pub disable_tips: bool,
+    pub disable_activity_history: bool,
+    pub disable_location: bool,
+    pub disable_cortana: bool,
+    pub disable_compat_telemetry: bool,
+
+    // Visual effects
+    pub disable_animations: bool,
+    pub disable_transparency: bool,
+    pub classic_menu: bool,
 
     pub tweaks_applied: bool,
     pub tweaks_backup: Option<SystemTweaksBackup>,

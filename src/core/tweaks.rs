@@ -414,10 +414,14 @@ fn disable_animations_reg() {
         r"Control Panel\Desktop\WindowMetrics", KEY_WRITE) {
         let _ = k.set_value("MinAnimate", &"0".to_string());
     }
-    if let Ok((k, _)) = hkcu.create_subkey_with_flags(
-        r"Control Panel\Desktop", KEY_WRITE) {
-        let _ = k.set_value("UserPreferencesMask", &[0x90u8, 0x12, 0x03, 0x80, 0x10, 0x00, 0x00, 0x00][..]);
-    }
+    // UserPreferencesMask via reg command (winreg doesn't support REG_BINARY easily)
+    let _ = std::process::Command::new("reg")
+        .args(["add", r"HKCU\Control Panel\Desktop",
+               "/v", "UserPreferencesMask",
+               "/t", "REG_BINARY",
+               "/d", "9012038010000000",
+               "/f"])
+        .output();
 }
 
 #[cfg(target_os = "windows")]

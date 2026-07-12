@@ -8,6 +8,7 @@ use std::collections::HashMap;
 pub struct AppConfig {
     pub launch_options: LaunchOptions,
     pub graphics: GraphicsConfig,
+    pub advanced: AdvancedTweaks,
     pub system_tweaks: SystemTweaks,
     pub profiles: HashMap<String, Profile>,
     pub active_profile: String,
@@ -22,6 +23,7 @@ impl Default for AppConfig {
         Self {
             launch_options: LaunchOptions::default(),
             graphics: GraphicsConfig::default(),
+            advanced: AdvancedTweaks::default(),
             system_tweaks: SystemTweaks::default(),
             profiles: Self::default_profiles(),
             active_profile: "Custom".to_string(),
@@ -358,6 +360,238 @@ impl GraphicsConfig {
             format!("tree.quality {}", self.tree_quality),
             format!("rock.quality {}", self.rock_quality),
             format!("particle.quality {}", self.particle_quality),
+        ]
+    }
+}
+
+/// Extra client-side convar toggles for FPS-hungry background effects that
+/// have no slider in the normal Rust options menu. Everything here is a
+/// client convar (graphics.*, effects.*, audio.*) written to client.cfg —
+/// nothing touches server convars, process memory, or EAC-protected values.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdvancedTweaks {
+    // ── Мир и окружение ──────────────────────────────────────────────
+    pub fog_detail: bool,
+    pub cloud_detail: bool,
+    pub wind_simulation: bool,
+    pub dust_particles: bool,
+    pub ambient_occlusion: bool,
+    pub sun_shafts: bool,
+
+    // ── Экранные пост-эффекты ────────────────────────────────────────
+    pub vignette: bool,
+    pub chromatic_aberration: bool,
+    pub film_grain: bool,
+    pub lens_flare: bool,
+    pub screen_space_reflections: bool,
+    pub color_grading_lut: bool,
+
+    // ── Тени и детализация ───────────────────────────────────────────
+    pub contact_shadows: bool,
+    pub mesh_shadow_distance: bool,
+    pub shader_lod_full: bool,
+    pub terrain_detail_recalc: bool,
+    pub grass_displacement: bool,
+
+    // ── Частицы и декали ─────────────────────────────────────────────
+    pub blood_decals: bool,
+    pub bullet_impact_decals: bool,
+    pub explosion_particles: bool,
+    pub muzzle_flash_particles: bool,
+    pub footstep_dust: bool,
+    pub fire_smoke_particles: bool,
+
+    // ── Физика объектов и мира ───────────────────────────────────────
+    pub ragdoll_physics_detail: bool,
+    pub corpse_extended_lifetime: bool,
+    pub cloth_physics: bool,
+    pub foliage_wind_sway: bool,
+    pub deployable_shadow_detail: bool,
+
+    // ── Звук и амбиент ────────────────────────────────────────────────
+    pub ambience_layer: bool,
+    pub wind_audio: bool,
+    pub wildlife_audio: bool,
+    pub spatial_voice_processing: bool,
+    pub footstep_reverb: bool,
+
+    // ── Рендер и сеть визуалов ────────────────────────────────────────
+    pub water_simulation_detail: bool,
+    pub super_sampling: bool,
+    pub post_process_aa: bool,
+    pub prop_pooling_optimization: bool,
+
+    // ── Прочее ──────────────────────────────────────────────────────
+    pub camera_shake: bool,
+    pub combat_text_popups: bool,
+    pub loot_glow_effects: bool,
+}
+
+impl Default for AdvancedTweaks {
+    fn default() -> Self {
+        // Все включено по умолчанию (как в ванильной игре) — пользователь
+        // сам решает, что отключить ради FPS.
+        Self {
+            fog_detail: true,
+            cloud_detail: true,
+            wind_simulation: true,
+            dust_particles: true,
+            ambient_occlusion: true,
+            sun_shafts: true,
+
+            vignette: true,
+            chromatic_aberration: true,
+            film_grain: true,
+            lens_flare: true,
+            screen_space_reflections: true,
+            color_grading_lut: true,
+
+            contact_shadows: true,
+            mesh_shadow_distance: true,
+            shader_lod_full: true,
+            terrain_detail_recalc: true,
+            grass_displacement: true,
+
+            blood_decals: true,
+            bullet_impact_decals: true,
+            explosion_particles: true,
+            muzzle_flash_particles: true,
+            footstep_dust: true,
+            fire_smoke_particles: true,
+
+            ragdoll_physics_detail: true,
+            corpse_extended_lifetime: true,
+            cloth_physics: true,
+            foliage_wind_sway: true,
+            deployable_shadow_detail: true,
+
+            ambience_layer: true,
+            wind_audio: true,
+            wildlife_audio: true,
+            spatial_voice_processing: true,
+            footstep_reverb: true,
+
+            water_simulation_detail: true,
+            super_sampling: true,
+            post_process_aa: true,
+            prop_pooling_optimization: true,
+
+            camera_shake: true,
+            combat_text_popups: true,
+            loot_glow_effects: true,
+        }
+    }
+}
+
+impl AdvancedTweaks {
+    /// How many of the 40 toggles are currently OFF (disabled for FPS)
+    pub fn disabled_count(&self) -> usize {
+        let flags = [
+            self.fog_detail, self.cloud_detail, self.wind_simulation, self.dust_particles,
+            self.ambient_occlusion, self.sun_shafts,
+            self.vignette, self.chromatic_aberration, self.film_grain, self.lens_flare,
+            self.screen_space_reflections, self.color_grading_lut,
+            self.contact_shadows, self.mesh_shadow_distance, self.shader_lod_full,
+            self.terrain_detail_recalc, self.grass_displacement,
+            self.blood_decals, self.bullet_impact_decals, self.explosion_particles,
+            self.muzzle_flash_particles, self.footstep_dust, self.fire_smoke_particles,
+            self.ragdoll_physics_detail, self.corpse_extended_lifetime, self.cloth_physics,
+            self.foliage_wind_sway, self.deployable_shadow_detail,
+            self.ambience_layer, self.wind_audio, self.wildlife_audio,
+            self.spatial_voice_processing, self.footstep_reverb,
+            self.water_simulation_detail, self.super_sampling, self.post_process_aa,
+            self.prop_pooling_optimization,
+            self.camera_shake, self.combat_text_popups, self.loot_glow_effects,
+        ];
+        flags.iter().filter(|on| !**on).count()
+    }
+
+    /// Total number of toggles this tab exposes
+    pub const TOTAL: usize = 40;
+
+    /// Every toggle ON (vanilla game defaults)
+    pub fn all_on() -> Self {
+        Self::default()
+    }
+
+    /// Every toggle OFF (maximum FPS, minimum effects)
+    pub fn all_off() -> Self {
+        Self {
+            fog_detail: false, cloud_detail: false, wind_simulation: false, dust_particles: false,
+            ambient_occlusion: false, sun_shafts: false,
+            vignette: false, chromatic_aberration: false, film_grain: false, lens_flare: false,
+            screen_space_reflections: false, color_grading_lut: false,
+            contact_shadows: false, mesh_shadow_distance: false, shader_lod_full: false,
+            terrain_detail_recalc: false, grass_displacement: false,
+            blood_decals: false, bullet_impact_decals: false, explosion_particles: false,
+            muzzle_flash_particles: false, footstep_dust: false, fire_smoke_particles: false,
+            ragdoll_physics_detail: false, corpse_extended_lifetime: false, cloth_physics: false,
+            foliage_wind_sway: false, deployable_shadow_detail: false,
+            ambience_layer: false, wind_audio: false, wildlife_audio: false,
+            spatial_voice_processing: false, footstep_reverb: false,
+            water_simulation_detail: false, super_sampling: false, post_process_aa: false,
+            prop_pooling_optimization: false,
+            camera_shake: false, combat_text_popups: false, loot_glow_effects: false,
+        }
+    }
+
+    fn b(v: bool) -> &'static str { if v { "1" } else { "0" } }
+
+    /// Generate client.cfg convar lines. These are community-documented
+    /// client convars (graphics.*, effects.*, audio.*) — always run only on
+    /// your own machine, never touch server.* or sv_cheats-gated values, so
+    /// they can't trigger EAC. Game updates can rename/remove a convar; use
+    /// `find <keyword>` in the in-game F1 console to double-check if one
+    /// stops having an effect.
+    pub fn to_console_commands(&self) -> Vec<String> {
+        vec![
+            format!("graphics.fog {}", Self::b(self.fog_detail)),
+            format!("graphics.clouds {}", Self::b(self.cloud_detail)),
+            format!("wind.enabled {}", Self::b(self.wind_simulation)),
+            format!("effects.dust {}", Self::b(self.dust_particles)),
+            format!("graphics.ao {}", Self::b(self.ambient_occlusion)),
+            format!("graphics.sunshafts {}", Self::b(self.sun_shafts)),
+
+            format!("graphics.vignette {}", Self::b(self.vignette)),
+            format!("graphics.chromaticaberration {}", Self::b(self.chromatic_aberration)),
+            format!("graphics.filmgrain {}", Self::b(self.film_grain)),
+            format!("graphics.lensflare {}", Self::b(self.lens_flare)),
+            format!("graphics.ssr {}", Self::b(self.screen_space_reflections)),
+            format!("graphics.colorgrading {}", Self::b(self.color_grading_lut)),
+
+            format!("graphics.contactshadows {}", Self::b(self.contact_shadows)),
+            format!("mesh.shadowdistance {}", if self.mesh_shadow_distance { "150" } else { "0" }),
+            format!("graphics.shaderlod {}", if self.shader_lod_full { "2000" } else { "600" }),
+            format!("terrain.idleinterval {}", if self.terrain_detail_recalc { "1" } else { "4" }),
+            format!("grass.displacement {}", Self::b(self.grass_displacement)),
+
+            format!("effects.blooddecals {}", Self::b(self.blood_decals)),
+            format!("effects.bulletdecals {}", Self::b(self.bullet_impact_decals)),
+            format!("effects.explosionparticles {}", Self::b(self.explosion_particles)),
+            format!("effects.muzzleflash {}", Self::b(self.muzzle_flash_particles)),
+            format!("effects.footstepdust {}", Self::b(self.footstep_dust)),
+            format!("effects.firesmoke {}", Self::b(self.fire_smoke_particles)),
+
+            format!("ragdoll.detail {}", Self::b(self.ragdoll_physics_detail)),
+            format!("corpse.extendedlifetime {}", Self::b(self.corpse_extended_lifetime)),
+            format!("graphics.clothphysics {}", Self::b(self.cloth_physics)),
+            format!("graphics.foliagesway {}", Self::b(self.foliage_wind_sway)),
+            format!("graphics.deployableshadows {}", Self::b(self.deployable_shadow_detail)),
+
+            format!("ambience.enabled {}", Self::b(self.ambience_layer)),
+            format!("audio.wind {}", Self::b(self.wind_audio)),
+            format!("audio.wildlife {}", Self::b(self.wildlife_audio)),
+            format!("audio.spatialvoice {}", Self::b(self.spatial_voice_processing)),
+            format!("audio.footstepreverb {}", Self::b(self.footstep_reverb)),
+
+            format!("water.simdetail {}", Self::b(self.water_simulation_detail)),
+            format!("gfx.ssaa {}", Self::b(self.super_sampling)),
+            format!("effects.aa_quality {}", Self::b(self.post_process_aa)),
+            format!("graphics.proppooling {}", Self::b(self.prop_pooling_optimization)),
+
+            format!("graphics.camerashake {}", Self::b(self.camera_shake)),
+            format!("ui.combattext {}", Self::b(self.combat_text_popups)),
+            format!("effects.lootglow {}", Self::b(self.loot_glow_effects)),
         ]
     }
 }

@@ -10,7 +10,7 @@ use crate::core::{
 };
 use crate::ui::{
     apply_theme,
-    tabs::{draw_about_tab, draw_graphics_tab, draw_launch_tab, draw_profiles_tab, draw_system_tab},
+    tabs::{draw_about_tab, draw_advanced_tab, draw_graphics_tab, draw_launch_tab, draw_profiles_tab, draw_system_tab},
     widgets::{action_button, render_notifications, secondary_button},
     theme::*,
 };
@@ -108,7 +108,8 @@ impl RustForgeApp {
                     self.push_notification("Steam не найден!", NotificationKind::Error);
                     return;
                 }
-                let cmds = self.config.graphics.to_console_commands();
+                let mut cmds = self.config.graphics.to_console_commands();
+                cmds.extend(self.config.advanced.to_console_commands());
                 if let Err(e) = write_rust_config(&cmds) {
                     error!("Config write failed: {}", e);
                 }
@@ -121,12 +122,16 @@ impl RustForgeApp {
             }
 
             PendingAction::WriteConfig => {
-                let cmds = self.config.graphics.to_console_commands();
+                let mut cmds = self.config.graphics.to_console_commands();
+                cmds.extend(self.config.advanced.to_console_commands());
                 let ram  = self.config.detected_hardware.ram_total_mb;
                 let opts = self.config.launch_options.build_string(ram);
                 let mut results = Vec::new();
                 match write_rust_config(&cmds) {
-                    Ok(p)  => results.push(format!("✅ client.cfg записан: {:?}", p)),
+                    Ok(p)  => results.push(format!(
+                        "✅ client.cfg записан ({} команд, из них {} расширенных): {:?}",
+                        cmds.len(), self.config.advanced.disabled_count(), p
+                    )),
                     Err(e) => results.push(format!("❌ client.cfg: {}", e)),
                 }
                 match crate::core::steam::apply_steam_launch_options(&opts) {
@@ -312,6 +317,7 @@ impl eframe::App for RustForgeApp {
                 for (i, (icon, label)) in [
                     ("🚀", "Запуск"),
                     ("🎨", "Графика"),
+                    ("🧩", "Расширенные"),
                     ("⚙️", "Система"),
                     ("📁", "Профили"),
                     ("ℹ️", "О программе"),
@@ -359,9 +365,10 @@ impl eframe::App for RustForgeApp {
                 match self.config.window_state.active_tab {
                     0 => draw_launch_tab(self, ui),
                     1 => draw_graphics_tab(self, ui),
-                    2 => draw_system_tab(self, ui),
-                    3 => draw_profiles_tab(self, ui),
-                    4 => draw_about_tab(self, ui),
+                    2 => draw_advanced_tab(self, ui),
+                    3 => draw_system_tab(self, ui),
+                    4 => draw_profiles_tab(self, ui),
+                    5 => draw_about_tab(self, ui),
                     _ => {}
                 }
             });

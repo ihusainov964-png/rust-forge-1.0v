@@ -17,6 +17,80 @@ pub const C_WARNING:     Color32 = Color32::from_rgb(230, 180,  40);
 pub const C_ERROR:       Color32 = Color32::from_rgb(220,  70,  60);
 pub const C_INFO:        Color32 = Color32::from_rgb(80,  160, 220);
 
+// ── Alternate palette: soft lavender/sage, inspired by the calm,
+// wandering-journal mood of "Frieren: Beyond Journey's End". Original
+// colours only — no copyrighted art, characters, or stills used anywhere.
+pub const F_LAVENDER:      Color32 = Color32::from_rgb(158, 142, 196);
+pub const F_LAVENDER_DARK: Color32 = Color32::from_rgb(108, 96,  146);
+pub const F_LAVENDER_SOFT: Color32 = Color32::from_rgb(196, 184, 222);
+pub const F_SAGE:          Color32 = Color32::from_rgb(140, 168, 150);
+pub const F_NIGHT:         Color32 = Color32::from_rgb(30,  28,  40);
+pub const F_NIGHT_MID:     Color32 = Color32::from_rgb(46,  42,  60);
+pub const F_NIGHT_LIGHT:   Color32 = Color32::from_rgb(64,  58,  82);
+pub const F_STAR:          Color32 = Color32::from_rgb(232, 220, 180);
+pub const F_TEXT:          Color32 = Color32::from_rgb(224, 218, 232);
+pub const F_TEXT_DIM:      Color32 = Color32::from_rgb(158, 150, 176);
+
+pub fn apply_frieren_theme(ctx: &egui::Context) {
+    let mut style = Style::default();
+
+    style.spacing.item_spacing   = egui::vec2(8.0, 6.0);
+    style.spacing.window_margin  = egui::style::Margin::same(14.0);
+    style.spacing.button_padding = egui::vec2(12.0, 6.0);
+    style.spacing.indent         = 18.0;
+    style.spacing.slider_width   = 160.0;
+
+    let r4 = Rounding::same(6.0);
+    let r6 = Rounding::same(9.0);
+    style.visuals.window_rounding = r6;
+    style.visuals.menu_rounding   = r6;
+    style.visuals.widgets.noninteractive.rounding = r4;
+    style.visuals.widgets.inactive.rounding       = r4;
+    style.visuals.widgets.hovered.rounding        = r4;
+    style.visuals.widgets.active.rounding         = r4;
+    style.visuals.widgets.open.rounding           = r4;
+
+    style.visuals.dark_mode = true;
+    style.visuals.override_text_color = Some(F_TEXT);
+    style.visuals.window_fill  = F_NIGHT;
+    style.visuals.window_stroke = Stroke::new(1.0, F_NIGHT_LIGHT);
+    style.visuals.panel_fill   = F_NIGHT;
+
+    style.visuals.widgets.noninteractive.bg_fill  = F_NIGHT_MID;
+    style.visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0, F_NIGHT_LIGHT);
+    style.visuals.widgets.noninteractive.fg_stroke = Stroke::new(1.0, F_TEXT_DIM);
+
+    style.visuals.widgets.inactive.bg_fill  = F_NIGHT_LIGHT;
+    style.visuals.widgets.inactive.bg_stroke = Stroke::new(1.0, F_LAVENDER_DARK);
+    style.visuals.widgets.inactive.fg_stroke = Stroke::new(1.0, F_TEXT);
+
+    style.visuals.widgets.hovered.bg_fill  = F_LAVENDER_DARK;
+    style.visuals.widgets.hovered.bg_stroke = Stroke::new(1.5, F_LAVENDER);
+    style.visuals.widgets.hovered.fg_stroke = Stroke::new(1.5, F_LAVENDER_SOFT);
+
+    style.visuals.widgets.active.bg_fill  = F_LAVENDER_DARK;
+    style.visuals.widgets.active.bg_stroke = Stroke::new(1.5, F_STAR);
+    style.visuals.widgets.active.fg_stroke = Stroke::new(2.0, F_STAR);
+
+    style.visuals.selection.bg_fill = F_LAVENDER_DARK.linear_multiply(1.4);
+    style.visuals.selection.stroke  = Stroke::new(1.0, F_LAVENDER);
+    style.visuals.hyperlink_color   = F_STAR;
+    style.visuals.code_bg_color     = F_NIGHT_MID;
+    style.visuals.faint_bg_color    = Color32::from_rgba_unmultiplied(255, 255, 255, 4);
+
+    ctx.set_style(style);
+
+    ctx.set_style({
+        let mut s = (*ctx.style()).clone();
+        s.text_styles.insert(egui::TextStyle::Heading, FontId::new(20.0, egui::FontFamily::Proportional));
+        s.text_styles.insert(egui::TextStyle::Body, FontId::new(14.0, egui::FontFamily::Proportional));
+        s.text_styles.insert(egui::TextStyle::Small, FontId::new(11.0, egui::FontFamily::Proportional));
+        s.text_styles.insert(egui::TextStyle::Button, FontId::new(14.0, egui::FontFamily::Proportional));
+        s.text_styles.insert(egui::TextStyle::Monospace, FontId::new(13.0, egui::FontFamily::Monospace));
+        std::sync::Arc::new(s)
+    });
+}
+
 pub fn apply_theme(ctx: &egui::Context) {
     let mut style = Style::default();
 

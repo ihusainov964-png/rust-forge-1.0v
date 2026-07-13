@@ -425,6 +425,11 @@ pub struct AdvancedTweaks {
     pub camera_shake: bool,
     pub combat_text_popups: bool,
     pub loot_glow_effects: bool,
+    pub aggressive_shadow_lod: bool,
+
+    /// Свои convar'ы — по одному на строку, например: graphics.foo 0
+    /// Найти новые можно в игре: F1 → find <слово>
+    pub custom_convars: String,
 }
 
 impl Default for AdvancedTweaks {
@@ -479,6 +484,8 @@ impl Default for AdvancedTweaks {
             camera_shake: true,
             combat_text_popups: true,
             loot_glow_effects: true,
+            aggressive_shadow_lod: true,
+            custom_convars: String::new(),
         }
     }
 }
@@ -502,12 +509,13 @@ impl AdvancedTweaks {
             self.water_simulation_detail, self.super_sampling, self.post_process_aa,
             self.prop_pooling_optimization,
             self.camera_shake, self.combat_text_popups, self.loot_glow_effects,
+            self.aggressive_shadow_lod,
         ];
         flags.iter().filter(|on| !**on).count()
     }
 
     /// Total number of toggles this tab exposes
-    pub const TOTAL: usize = 40;
+    pub const TOTAL: usize = 41;
 
     /// Every toggle ON (vanilla game defaults)
     pub fn all_on() -> Self {
@@ -532,6 +540,8 @@ impl AdvancedTweaks {
             water_simulation_detail: false, super_sampling: false, post_process_aa: false,
             prop_pooling_optimization: false,
             camera_shake: false, combat_text_popups: false, loot_glow_effects: false,
+            aggressive_shadow_lod: false,
+            custom_convars: String::new(),
         }
     }
 
@@ -544,7 +554,7 @@ impl AdvancedTweaks {
     /// `find <keyword>` in the in-game F1 console to double-check if one
     /// stops having an effect.
     pub fn to_console_commands(&self) -> Vec<String> {
-        vec![
+        let mut cmds = vec![
             format!("graphics.fog {}", Self::b(self.fog_detail)),
             format!("graphics.clouds {}", Self::b(self.cloud_detail)),
             format!("wind.enabled {}", Self::b(self.wind_simulation)),
@@ -592,7 +602,17 @@ impl AdvancedTweaks {
             format!("graphics.camerashake {}", Self::b(self.camera_shake)),
             format!("ui.combattext {}", Self::b(self.combat_text_popups)),
             format!("effects.lootglow {}", Self::b(self.loot_glow_effects)),
-        ]
+            format!("graphics.aggressiveShadowLod {}", Self::b(self.aggressive_shadow_lod)),
+        ];
+
+        for line in self.custom_convars.lines() {
+            let line = line.trim();
+            if !line.is_empty() {
+                cmds.push(line.to_string());
+            }
+        }
+
+        cmds
     }
 }
 
@@ -671,6 +691,10 @@ pub struct Profile {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct WindowState {
     pub active_tab: usize,
+    /// Alternate soft lavender/sage colour theme, inspired by the calm
+    /// travel-journal mood of "Frieren: Beyond Journey's End" — an
+    /// original palette, no copyrighted artwork or characters involved.
+    pub frieren_theme: bool,
 }
 
 /// Notification shown to user

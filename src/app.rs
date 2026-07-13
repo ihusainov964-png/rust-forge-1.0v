@@ -43,12 +43,12 @@ pub struct RustForgeApp {
 
     // Save throttle
     last_save: std::time::Instant,
+    // Cached theme flag so we only re-apply egui style when it actually changes
+    last_theme_state: bool,
 }
 
 impl RustForgeApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        apply_theme(&cc.egui_ctx);
-
         // Heavy ops only once at startup
         let mut config = load_config();
         config.detected_hardware = detect_hardware();
@@ -59,10 +59,17 @@ impl RustForgeApp {
             config.detected_hardware.gpu_name,
         );
 
+        if config.window_state.frieren_theme {
+            apply_frieren_theme(&cc.egui_ctx);
+        } else {
+            apply_theme(&cc.egui_ctx);
+        }
+
         let steam_found = crate::core::steam::find_steam_path().is_some();
 
         // Cache initial perf info
         let cached_perf_info = crate::core::tweaks::get_windows_perf_info();
+        let last_theme_state = config.window_state.frieren_theme;
 
         Self {
             config,
@@ -75,6 +82,7 @@ impl RustForgeApp {
             cached_perf_info,
             perf_info_age: std::time::Instant::now(),
             last_save: std::time::Instant::now(),
+            last_theme_state,
         }
     }
 
@@ -216,6 +224,15 @@ impl eframe::App for RustForgeApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.process_pending_action();
 
+        if self.config.window_state.frieren_theme != self.last_theme_state {
+            if self.config.window_state.frieren_theme {
+                apply_frieren_theme(ctx);
+            } else {
+                apply_theme(ctx);
+            }
+            self.last_theme_state = self.config.window_state.frieren_theme;
+        }
+
         // Auto-save every 30 seconds (not every frame!)
         if self.last_save.elapsed().as_secs() >= 30 {
             let _ = save_config(&self.config);
@@ -266,6 +283,21 @@ impl eframe::App for RustForgeApp {
                         .fill(C_RUST)
                         .stroke(egui::Stroke::new(2.0, C_RUST_BRIGHT))
                         .min_size(egui::vec2(170.0, 34.0));
+
+                        ui.add_space(8.0);
+                        let theme_label = if self.config.window_state.frieren_theme {
+                            "🌙 Тема: странник"
+                        } else {
+                            "🔥 Тема: индастриал"
+                        };
+                        if ui.add(egui::Button::new(RichText::new(theme_label).size(11.0))
+                            .min_size(egui::vec2(0.0, 26.0))).on_hover_text(
+                                "Переключить оформление — оригинальная спокойная лавандовая \
+                                 палитра в духе неспешных странствий, без чужого арта/персонажей."
+                            ).clicked()
+                        {
+                            self.config.window_state.frieren_theme = !self.config.window_state.frieren_theme;
+                        }
 
                         if ui.add(boost_btn)
                             .on_hover_text("Применяет профиль «Balanced PVP» + запускает Rust")

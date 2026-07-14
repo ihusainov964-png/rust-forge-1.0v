@@ -23,17 +23,36 @@ pub fn draw_advanced_tab(app: &mut RustForgeApp, ui: &mut Ui) {
         ui.add_space(4.0);
 
         egui::Frame::none()
+            .fill(C_WARNING.linear_multiply(0.1))
+            .stroke(egui::Stroke::new(1.0, C_WARNING.linear_multiply(0.5)))
+            .inner_margin(egui::style::Margin::symmetric(12.0, 8.0))
+            .rounding(egui::Rounding::same(5.0))
+            .show(ui, |ui| {
+                ui.label(RichText::new(
+                    "⚠️  Только graphics.aggressiveShadowLod ниже подтверждён официальными патчнотами \
+                     Facepunch — он применяется всегда и безопасен.\n\
+                     Остальные 40 переключателей названы по аналогии с реальными convar'ами, но НЕ \
+                     проверены по отдельности в текущей версии игры. Часть из них может не существовать \
+                     (игра просто их проигнорирует), а часть — оказаться настоящими convar'ами с другим \
+                     смыслом значений, и тогда результат непредсказуем вплоть до падения FPS.\n\
+                     Поэтому они НЕ пишутся в client.cfg, пока ты сам не поставишь галочку ниже."
+                ).color(C_WARNING).size(12.0));
+                ui.add_space(6.0);
+                ui.checkbox(&mut app.config.advanced.experimental_acknowledged,
+                    "Понимаю риск — применять эти 40 переключателей на свой страх и риск");
+            });
+        ui.add_space(8.0);
+
+        egui::Frame::none()
             .fill(C_INFO.linear_multiply(0.08))
             .stroke(egui::Stroke::new(1.0, C_INFO.linear_multiply(0.4)))
             .inner_margin(egui::style::Margin::symmetric(12.0, 8.0))
             .rounding(egui::Rounding::same(5.0))
             .show(ui, |ui| {
                 ui.label(RichText::new(
-                    "ℹ️  40 «паразитных» client-convar'ов Rust, которых нет в обычном меню настроек.\n\
-                     ✅ Галочка = эффект ВЫКЛЮЧЕН (больше FPS). Пустой чекбокс = эффект включён (как в ванильной игре).\n\
-                     Всё это graphics.*/effects.*/audio.* — пишется в client.cfg, ничего не трогает EAC \
-                     и server-convar'ы. После апдейта игры конкретный convar иногда переименовывают — \
-                     если эффект пропал, набери в игре F1 → find <слово>, чтобы проверить актуальное имя."
+                    "ℹ️  ✅ Галочка = эффект ВЫКЛЮЧЕН (больше FPS). Пустой чекбокс = эффект включён (как в ванильной игре).\n\
+                     После апдейта игры convar иногда переименовывают — если эффект не сработал, \
+                     набери в игре F1 → find <слово>, чтобы проверить актуальное имя."
                 ).color(C_TEXT_DIM).size(12.0));
             });
         ui.add_space(8.0);

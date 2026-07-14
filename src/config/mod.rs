@@ -3,6 +3,12 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Cheap early read of just the theme preference, used by main.rs to pick
+/// the matching window icon before the egui context exists.
+pub fn load_and_peek_theme() -> bool {
+    crate::core::persistence::load_config().window_state.frieren_theme
+}
+
 /// Complete app state saved to disk
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -430,6 +436,14 @@ pub struct AdvancedTweaks {
     /// Свои convar'ы — по одному на строку, например: graphics.foo 0
     /// Найти новые можно в игре: F1 → find <слово>
     pub custom_convars: String,
+
+    /// Master gate: only `graphics.aggressiveShadowLod` (verified against
+    /// official Facepunch patch notes) applies by default. The other 40
+    /// toggles are named by convention, not individually confirmed against
+    /// the live game — they must be explicitly acknowledged before they're
+    /// written to client.cfg, since a wrong guess about a real convar's
+    /// value range can hurt performance instead of helping it.
+    pub experimental_acknowledged: bool,
 }
 
 impl Default for AdvancedTweaks {
@@ -486,6 +500,7 @@ impl Default for AdvancedTweaks {
             loot_glow_effects: true,
             aggressive_shadow_lod: true,
             custom_convars: String::new(),
+            experimental_acknowledged: false,
         }
     }
 }
@@ -542,6 +557,7 @@ impl AdvancedTweaks {
             camera_shake: false, combat_text_popups: false, loot_glow_effects: false,
             aggressive_shadow_lod: false,
             custom_convars: String::new(),
+            experimental_acknowledged: false,
         }
     }
 
@@ -554,7 +570,17 @@ impl AdvancedTweaks {
     /// `find <keyword>` in the in-game F1 console to double-check if one
     /// stops having an effect.
     pub fn to_console_commands(&self) -> Vec<String> {
+        // Only this one is confirmed against official Facepunch patch notes.
+        // It always applies — it's safe.
         let mut cmds = vec![
+            format!("graphics.aggressiveShadowLod {}", Self::b(self.aggressive_shadow_lod)),
+        ];
+
+        // The other 40 are named by convention, not individually verified —
+        // after the July 2026 FPS regression, they only get written once the
+        // user has ticked "I understand these aren't fully verified" below.
+        if self.experimental_acknowledged {
+            cmds.extend(vec![
             format!("graphics.fog {}", Self::b(self.fog_detail)),
             format!("graphics.clouds {}", Self::b(self.cloud_detail)),
             format!("wind.enabled {}", Self::b(self.wind_simulation)),
@@ -602,9 +628,11 @@ impl AdvancedTweaks {
             format!("graphics.camerashake {}", Self::b(self.camera_shake)),
             format!("ui.combattext {}", Self::b(self.combat_text_popups)),
             format!("effects.lootglow {}", Self::b(self.loot_glow_effects)),
-            format!("graphics.aggressiveShadowLod {}", Self::b(self.aggressive_shadow_lod)),
-        ];
+            ]);
+        }
 
+        // Custom convars always apply — the user typed these themselves
+        // after finding them in the live game console, so they're trusted.
         for line in self.custom_convars.lines() {
             let line = line.trim();
             if !line.is_empty() {

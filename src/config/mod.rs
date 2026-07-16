@@ -11,6 +11,7 @@ pub fn load_and_peek_theme() -> bool {
 
 /// Complete app state saved to disk
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct AppConfig {
     pub launch_options: LaunchOptions,
     pub graphics: GraphicsConfig,
@@ -199,6 +200,7 @@ impl AppConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct LaunchOptions {
     pub high_priority: bool,
     pub no_log: bool,
@@ -274,6 +276,7 @@ impl LaunchOptions {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct GraphicsConfig {
     pub quality: u8,           // 0-6
     pub shadow_quality: u8,    // 0-3
@@ -375,6 +378,7 @@ impl GraphicsConfig {
 /// client convar (graphics.*, effects.*, audio.*) written to client.cfg —
 /// nothing touches server convars, process memory, or EAC-protected values.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct AdvancedTweaks {
     // ── Мир и окружение ──────────────────────────────────────────────
     pub fog_detail: bool,
@@ -645,6 +649,7 @@ impl AdvancedTweaks {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
 pub struct SystemTweaks {
     // Performance
     pub ultimate_power_plan: bool,
@@ -690,13 +695,15 @@ pub struct SystemTweaks {
     pub tweaks_backup: Option<SystemTweaksBackup>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
 pub struct SystemTweaksBackup {
     pub timestamp: String,
     pub previous_power_plan: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
 pub struct HardwareInfo {
     pub ram_total_mb: u64,
     pub cpu_cores: u32,
@@ -707,7 +714,8 @@ pub struct HardwareInfo {
     pub is_amd: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
 pub struct Profile {
     pub name: String,
     pub description: String,
@@ -717,6 +725,7 @@ pub struct Profile {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
 pub struct WindowState {
     pub active_tab: usize,
     /// Alternate soft lavender/sage colour theme, inspired by the calm

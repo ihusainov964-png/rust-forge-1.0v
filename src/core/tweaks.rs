@@ -189,6 +189,64 @@ fn extract_guid(s: &str) -> Option<String> {
     None
 }
 
+// ── Shader cache clearing (safe, documented paths only) ─────────────────────
+// D3DSCache itself is hardcoded by Windows and NOT meant to be manually
+// deleted — Microsoft's own docs point to Disk Cleanup's "DirectX Shader
+// Cache" category as the sanctioned way to clear it. Vendor caches
+// (NVIDIA DXCache/GLCache, Intel ShaderCache) DO have documented, safe,
+// user-deletable folders — we only ever touch those specific known
+// sub-folders, never anything else in AppData.
+#[cfg(target_os = "windows")]
+pub fn clear_shader_caches(hw: &crate::config::HardwareInfo) -> Result<Vec<String>> {
+    let mut cleared = Vec::new();
+
+    // 1. System-wide DirectX Shader Cache — point the user at the official
+    //    Windows mechanism (Disk Cleanup) rather than deleting files
+    //    ourselves in a folder Microsoft explicitly says is hardcoded and
+    //    not meant for manual management.
+    cleared.push("ℹ️ DirectX Shader Cache: Win+S → 'Очистка диска' → отметь 'Кэш шейдеров DirectX' → OK. \
+                   Это официальный механизм Windows — так же его чистит и сам Microsoft.".to_string());
+
+    // 2. Vendor-specific caches — only the documented sub-folders, only for
+    //    the vendor we actually detected, nothing guessed.
+    let gpu_lower = hw.gpu_name.to_lowercase();
+    let is_intel_gpu = gpu_lower.contains("intel");
+
+    if hw.is_nvidia {
+        if let Some(local) = dirs::data_local_dir() {
+            for sub in ["NVIDIA/DXCache", "NVIDIA/GLCache"] {
+                let path = local.join(sub);
+                if path.exists() {
+                    match std::fs::remove_dir_all(&path) {
+                        Ok(_)  => cleared.push(format!("✅ Очищено: {}", path.display())),
+                        Err(e) => cleared.push(format!("⚠️ Не удалось очистить {}: {}", path.display(), e)),
+                    }
+                }
+            }
+        }
+    }
+    if is_intel_gpu {
+        if let Some(local_low) = dirs::home_dir().map(|h| h.join("AppData").join("LocalLow")) {
+            let path = local_low.join("Intel").join("ShaderCache");
+            if path.exists() {
+                match std::fs::remove_dir_all(&path) {
+                    Ok(_)  => cleared.push(format!("✅ Очищено: {}", path.display())),
+                    Err(e) => cleared.push(format!("⚠️ Не удалось очистить {}: {}", path.display(), e)),
+                }
+            }
+        }
+    }
+
+    // Rust's own local shader/asset cache is NOT touched here — I could not
+    // find an officially documented, verifiable path for it (unlike the
+    // vendor caches above), and guessing one is exactly the mistake we're
+    // trying not to repeat.
+    cleared.push("ℹ️ Отдельный кэш самого Rust не трогаю — его точный путь и формат официально \
+                   не задокументирован, а гадать я больше не буду.".to_string());
+
+    Ok(cleared)
+}
+
 // ── Services ──────────────────────────────────────────────────────────────────
 
 #[cfg(target_os = "windows")]

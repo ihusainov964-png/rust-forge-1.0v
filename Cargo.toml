@@ -23,6 +23,12 @@ log         = "=0.4.20"
 env_logger  = "=0.10.1"
 chrono      = { version = "=0.4.31", features = ["serde"] }
 anyhow      = "=1.0.75"
+# Pinned to the 0.29.x API surface deliberately — I know this exact API
+# (System::new_all, refresh_all, trait-based SystemExt/CpuExt) with
+# certainty. sysinfo 0.30+ removed those traits and reshaped the API in
+# ways I haven't verified against live docs, and after the convar mistake
+# I'd rather ship something I'm sure compiles than the newest version.
+sysinfo     = "0.29"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "=0.51.0"
@@ -33,6 +39,9 @@ winapi = { version = "=0.3.9", features = [
     "libloaderapi",
     "processthreadsapi",
     "winerror",
+    "winbase",
+    "winnt",
+    "handleapi",
 ] }
 
 [patch.crates-io]

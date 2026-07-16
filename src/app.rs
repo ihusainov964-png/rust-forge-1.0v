@@ -45,6 +45,11 @@ pub struct RustForgeApp {
     last_save: std::time::Instant,
     // Cached theme flag so we only re-apply egui style when it actually changes
     last_theme_state: bool,
+
+    // Live RAM/CPU monitoring
+    monitor: crate::core::monitor::SystemMonitor,
+    monitor_stats: crate::core::monitor::LiveStats,
+    monitor_last_refresh: std::time::Instant,
 }
 
 impl RustForgeApp {
@@ -70,6 +75,8 @@ impl RustForgeApp {
         // Cache initial perf info
         let cached_perf_info = crate::core::tweaks::get_windows_perf_info();
         let last_theme_state = config.window_state.frieren_theme;
+        let monitor = crate::core::monitor::SystemMonitor::new();
+        let monitor_stats = monitor.snapshot();
 
         Self {
             config,
@@ -83,6 +90,9 @@ impl RustForgeApp {
             perf_info_age: std::time::Instant::now(),
             last_save: std::time::Instant::now(),
             last_theme_state,
+            monitor,
+            monitor_stats,
+            monitor_last_refresh: std::time::Instant::now(),
         }
     }
 
@@ -233,6 +243,15 @@ impl eframe::App for RustForgeApp {
             self.last_theme_state = self.config.window_state.frieren_theme;
         }
 
+        if self.monitor_last_refresh.elapsed() >= std::time::Duration::from_secs(1) {
+            self.monitor.refresh();
+            self.monitor_stats = self.monitor.snapshot();
+            self.monitor_last_refresh = std::time::Instant::now();
+        }
+        // Live stats need periodic repaints even with no mouse/keyboard input —
+        // egui otherwise only redraws in response to user interaction.
+        ctx.request_repaint_after(std::time::Duration::from_millis(500));
+
         // Auto-save every 30 seconds (not every frame!)
         if self.last_save.elapsed().as_secs() >= 30 {
             let _ = save_config(&self.config);
@@ -328,6 +347,18 @@ impl eframe::App for RustForgeApp {
                     ui.label(RichText::new(
                         "Только легальные твики • Безопасно для EAC"
                     ).size(11.0).color(C_TEXT_DIM));
+                    ui.separator();
+                    let live = self.monitor_stats;
+                    let ram_color = if live.ram_percent > 85.0 { C_WARNING } else { C_TEXT_DIM };
+                    let cpu_color = if live.cpu_percent > 85.0 { C_WARNING } else { C_TEXT_DIM };
+                    ui.label(RichText::new(format!("🧠 RAM {:.0}%", live.ram_percent)).size(11.0).color(ram_color));
+                    ui.label(RichText::new(format!("({} / {} MB)", live.ram_used_mb, live.ram_total_mb)).size(10.0).color(C_TEXT_DIM));
+                    ui.separator();
+                    ui.label(RichText::new(format!("⚙️ CPU {:.0}%", live.cpu_percent)).size(11.0).color(cpu_color));
+                    if let Some(rust_cpu) = live.rust_process_cpu {
+                        ui.separator();
+                        ui.label(RichText::new(format!("🎮 Rust: {:.0}% CPU", rust_cpu)).size(11.0).color(C_SUCCESS));
+                    }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if secondary_button(ui, "🗑️ Очистить кэш").clicked() {
                             self.pending_action = Some(PendingAction::ClearCache);

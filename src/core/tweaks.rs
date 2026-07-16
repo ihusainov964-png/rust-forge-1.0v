@@ -90,7 +90,62 @@ pub fn revert_system_tweaks() -> Result<Vec<String>> {
     Ok(reverted)
 }
 
-// ── Power Plan ────────────────────────────────────────────────────────────────
+// ── Process priority boost (post-launch) ────────────────────────────────────
+// The "-high" launch arg only works if Unity's own engine reads and applies
+// it — it isn't a real Windows/Steam mechanism. What actually reliably
+// works: find the process after Steam launches it, then call the standard
+// Win32 SetPriorityClass on it ourselves. This uses only well-documented,
+// decades-old APIs (SetPriorityClass, OpenProcess) — no guessing involved.
+//
+// Deliberately NOT implemented here: CPU affinity pinning to "performance
+// cores". Correctly identifying P-cores vs E-cores on hybrid Intel CPUs
+// needs GetLogicalProcessorInformationEx with EfficiencyClass, and a wrong
+// guess would pin the game to the SLOW cores — the opposite of the goal.
+// I'd rather ship nothing here than repeat the convar mistake with core
+// numbers instead of console commands.
+
+#[cfg(target_os = "windows")]
+pub fn boost_rust_process_priority(monitor: &mut crate::core::monitor::SystemMonitor) -> Result<()> {
+    use std::time::{Duration, Instant};
+    use winapi::um::processthreadsapi::{OpenProcess, SetPriorityClass};
+    use winapi::um::winbase::HIGH_PRIORITY_CLASS;
+    use winapi::um::winnt::{PROCESS_SET_INFORMATION, PROCESS_QUERY_INFORMATION};
+
+    // Poll for up to 30s for the game process to appear after launch —
+    // Steam's own launch handshake + Unity init can take a few seconds.
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let pid = loop {
+        monitor.refresh();
+        if let Some(pid) = find_rust_pid(monitor) {
+            break pid;
+        }
+        if Instant::now() >= deadline {
+            return Err(anyhow!("RustClient.exe не появился в процессах за 30 секунд"));
+        }
+        std::thread::sleep(Duration::from_millis(500));
+    };
+
+    unsafe {
+        let handle = OpenProcess(PROCESS_SET_INFORMATION | PROCESS_QUERY_INFORMATION, 0, pid);
+        if handle.is_null() {
+            return Err(anyhow!("Не удалось открыть процесс Rust (PID {}) — недостаточно прав?", pid));
+        }
+        let ok = SetPriorityClass(handle, HIGH_PRIORITY_CLASS);
+        winapi::um::handleapi::CloseHandle(handle);
+        if ok == 0 {
+            return Err(anyhow!("SetPriorityClass не сработал для PID {}", pid));
+        }
+    }
+    info!("Rust process priority boosted to HIGH (PID {})", pid);
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn find_rust_pid(monitor: &crate::core::monitor::SystemMonitor) -> Option<u32> {
+    monitor.rust_pid()
+}
+
+
 
 #[cfg(target_os = "windows")]
 fn apply_ultimate_power_plan() -> Result<()> {

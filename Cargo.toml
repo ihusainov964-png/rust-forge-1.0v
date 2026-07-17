@@ -29,6 +29,9 @@ anyhow      = "=1.0.75"
 # ways I haven't verified against live docs, and after the convar mistake
 # I'd rather ship something I'm sure compiles than the newest version.
 sysinfo     = "0.29"
+ureq        = { version = "2", features = ["json"] }
+semver      = "1"
+open        = "5"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "=0.51.0"

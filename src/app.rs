@@ -50,6 +50,11 @@ pub struct RustForgeApp {
     monitor: crate::core::monitor::SystemMonitor,
     monitor_stats: crate::core::monitor::LiveStats,
     monitor_last_refresh: std::time::Instant,
+
+    // Update checker — background thread, checked non-blockingly
+    update_rx: std::sync::mpsc::Receiver<Option<crate::core::update_checker::UpdateInfo>>,
+    update_available: Option<crate::core::update_checker::UpdateInfo>,
+    update_banner_dismissed: bool,
 }
 
 impl RustForgeApp {
@@ -77,6 +82,7 @@ impl RustForgeApp {
         let last_theme_state = config.window_state.frieren_theme;
         let monitor = crate::core::monitor::SystemMonitor::new();
         let monitor_stats = monitor.snapshot();
+        let update_rx = crate::core::update_checker::check_for_updates_async();
 
         Self {
             config,
@@ -93,6 +99,9 @@ impl RustForgeApp {
             monitor,
             monitor_stats,
             monitor_last_refresh: std::time::Instant::now(),
+            update_rx,
+            update_available: None,
+            update_banner_dismissed: false,
         }
     }
 
@@ -243,6 +252,10 @@ impl eframe::App for RustForgeApp {
             self.last_theme_state = self.config.window_state.frieren_theme;
         }
 
+        if let Ok(result) = self.update_rx.try_recv() {
+            self.update_available = result;
+        }
+
         if self.monitor_last_refresh.elapsed() >= std::time::Duration::from_secs(1) {
             self.monitor.refresh();
             self.monitor_stats = self.monitor.snapshot();
@@ -333,6 +346,32 @@ impl eframe::App for RustForgeApp {
                     });
                 });
             });
+
+        // ── Update banner (dismissible, only shown if a newer release exists) ──
+        if let Some(update) = self.update_available.clone() {
+            if !self.update_banner_dismissed {
+                egui::TopBottomPanel::top("update_banner")
+                    .frame(egui::Frame::none()
+                        .fill(C_SUCCESS.linear_multiply(0.15))
+                        .stroke(egui::Stroke::new(1.0, C_SUCCESS.linear_multiply(0.5)))
+                        .inner_margin(egui::style::Margin::symmetric(16.0, 6.0)))
+                    .show(ctx, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new(format!(
+                                "🆕 Доступна новая версия {}", update.latest_version
+                            )).size(12.0).color(C_SUCCESS));
+                            if ui.link(RichText::new("Скачать →").size(12.0)).clicked() {
+                                let _ = open::that(&update.download_url);
+                            }
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                if ui.small_button("✕").clicked() {
+                                    self.update_banner_dismissed = true;
+                                }
+                            });
+                        });
+                    });
+            }
+        }
 
         // ── Bottom bar ───────────────────────────────────────────────────────
         egui::TopBottomPanel::bottom("bottom_panel")

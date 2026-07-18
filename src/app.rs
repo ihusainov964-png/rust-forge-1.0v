@@ -26,6 +26,7 @@ pub enum PendingAction {
     RestoreBackup,
     ClearCache,
     RefreshSysInfo,
+    RunDiagnostics,
 }
 
 pub struct RustForgeApp {
@@ -227,6 +228,32 @@ impl RustForgeApp {
                 self.perf_info_age = std::time::Instant::now();
                 self.push_notification("Статус системы обновлён", NotificationKind::Info);
             }
+
+            PendingAction::RunDiagnostics => {
+                match crate::core::diagnostics::run_diagnostics() {
+                    Ok(report) => {
+                        self.action_results.clear();
+                        self.action_results.push(format!("Схема питания: {}", report.active_power_plan));
+                        self.action_results.push(format!(
+                            "Ultimate/High Performance активна: {}",
+                            if report.is_ultimate_or_high_perf { "да ✅" } else { "нет ❌" }
+                        ));
+                        if let Some(pct) = report.core_parking_min_percent {
+                            self.action_results.push(format!("Core parking min: {}%", pct));
+                        }
+                        if let Some(gb) = report.game_bar_enabled {
+                            self.action_results.push(format!("Game Bar: {}", if gb { "включён" } else { "выключен" }));
+                        }
+                        if let Some(hags) = report.hags_enabled {
+                            self.action_results.push(format!("HAGS (GPU Scheduling): {}", if hags { "включён" } else { "выключен" }));
+                        }
+                        self.action_results.push(report.fullscreen_opt_hint.clone());
+                        self.action_results.extend(report.warnings.clone());
+                        self.show_results_modal = true;
+                    }
+                    Err(e) => self.push_notification(&format!("Диагностика не удалась: {}", e), NotificationKind::Error),
+                }
+            }
         }
 
         // Throttled save — not more than once per 2 seconds
@@ -401,6 +428,10 @@ impl eframe::App for RustForgeApp {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if secondary_button(ui, "🗑️ Очистить кэш").clicked() {
                             self.pending_action = Some(PendingAction::ClearCache);
+                        }
+                        ui.add_space(6.0);
+                        if secondary_button(ui, "🔍 Диагностика").clicked() {
+                            self.pending_action = Some(PendingAction::RunDiagnostics);
                         }
                     });
                 });
